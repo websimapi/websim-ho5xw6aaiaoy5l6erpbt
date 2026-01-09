@@ -49,13 +49,25 @@ if (muteBtn) {
 }
 
 // Setup User Info via WebsimSocket
-const room = new WebsimSocket();
-room.initialize().then(() => {
-    const me = room.peers[room.clientId];
-    if(me) {
-        game.setPlayerInfo(me);
-    }
-});
+try {
+    const room = new WebsimSocket();
+    room.initialize().then(() => {
+        const me = room.peers[room.clientId];
+        if(me) {
+            game.setPlayerInfo(me);
+        } else {
+            game.setPlayerInfo({ username: 'Player', avatarUrl: '' });
+        }
+    }).catch(e => {
+        console.warn('WebsimSocket init failed', e);
+        game.setPlayerInfo({ username: 'Player', avatarUrl: '' });
+    });
+} catch (e) {
+    console.warn('WebsimSocket missing', e);
+    setTimeout(() => {
+        game.setPlayerInfo({ username: 'Player', avatarUrl: '' });
+    }, 500);
+}
 
 // Raycaster for interaction
 const raycaster = new THREE.Raycaster();

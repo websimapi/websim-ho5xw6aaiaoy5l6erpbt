@@ -23,7 +23,9 @@ export const createEarth = (baseRadius, rippleUniformsRef) => {
         shader.uniforms.uIslands = uniforms.uIslands;
 
         // Vertex: Height
-        shader.vertexShader = `
+        shader.vertexShader = shader.vertexShader.replace(
+            '#include <common>',
+            `#include <common>
             uniform float uEarthRadius;
             uniform vec4 uIslands[10];
             varying vec3 vWorldPos;
@@ -45,7 +47,8 @@ export const createEarth = (baseRadius, rippleUniformsRef) => {
                 }
                 return totalH;
             }
-        ` + shader.vertexShader;
+            `
+        );
 
         shader.vertexShader = shader.vertexShader.replace(
             '#include <worldpos_vertex>',
@@ -59,7 +62,9 @@ export const createEarth = (baseRadius, rippleUniformsRef) => {
         );
 
         // Fragment: Color
-        shader.fragmentShader = `
+        shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <common>',
+            `#include <common>
             uniform float uTime;
             uniform vec3 uRippleCenters[5];
             uniform float uRippleStartTimes[5];
@@ -93,7 +98,8 @@ export const createEarth = (baseRadius, rippleUniformsRef) => {
             float hash(vec2 p) {
                 return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
             }
-        ` + shader.fragmentShader;
+            `
+        );
 
         shader.fragmentShader = shader.fragmentShader.replace(
             '#include <dithering_fragment>',
