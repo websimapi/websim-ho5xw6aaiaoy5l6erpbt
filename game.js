@@ -394,6 +394,30 @@ export class Game {
         this.targetPoint = point.clone().normalize().multiplyScalar(this.earthRadius);
     }
 
+    getInteractables() {
+        return this.earth ? [this.earth] : [];
+    }
+
+    triggerTap(point, duration, object) {
+        // Check if we tapped on an island
+        const islandData = this.islands.map(i => ({
+            pos: i.pos,
+            radius: i.currentRadius,
+            height: i.currentHeight,
+            seed: i.seed
+        }));
+
+        const h = getIslandHeight(point, islandData, this.earthRadius);
+
+        // If we hit an island (height > 0.2), do not trigger ripple
+        if (h > 0.2) {
+            return;
+        }
+
+        // Otherwise, trigger ripple
+        this.triggerRipple(point, duration);
+    }
+
     triggerRipple(point, durationMs) {
         const idx = this.currentRippleIdx;
         this.rippleUniforms.uRippleCenters.value[idx].copy(point);
