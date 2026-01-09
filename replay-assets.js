@@ -261,3 +261,24 @@ export const createSegment = (colorHex) => {
     const segMat = new THREE.MeshStandardMaterial({ color: colorHex });
     return new THREE.Mesh(segGeo, segMat);
 };
+
+export const createIslandMesh = (seed) => {
+    const geo = new THREE.IcosahedronGeometry(1, 1); 
+    const posAttr = geo.attributes.position;
+    const noise = (x,y,z) => Math.sin(x*3 + seed) * Math.cos(y*4 + seed) * Math.sin(z*5);
+    for(let i=0; i<posAttr.count; i++) {
+        const x = posAttr.getX(i);
+        const y = posAttr.getY(i);
+        const z = posAttr.getZ(i);
+        const n = noise(x,y,z) * 0.3;
+        posAttr.setXYZ(i, x*(1+n), y*(1+n), z*(1+n));
+    }
+    geo.computeVertexNormals();
+
+    const mat = new THREE.MeshStandardMaterial({ 
+        color: 0x44aa44, 
+        roughness: 0.8,
+        flatShading: true
+    });
+    return new THREE.Mesh(geo, mat);
+};

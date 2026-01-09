@@ -24,9 +24,11 @@ export class Game {
         this.time = 0;
 
         // Islands
-        this.islands = []; // { pos: Vec3, maxRadius: float, currentRadius: float, progress: float, seed: float, maxHeight: float, currentHeight: float }
+        this.islands = []; 
+        this.islandMeshes = []; // Keep track of meshes
         this.lastIslandScore = 0;
         this.MAX_ISLANDS = 10;
+        this.tapMarkers = []; // { mesh, age }
 
         // Visuals
         this.rippleUniforms = {
@@ -35,8 +37,8 @@ export class Game {
             uRippleStartTimes: { value: new Array(5).fill(-1000) },
             uRippleIntensities: { value: new Array(5).fill(0) },
             uEarthRadius: { value: this.BASE_RADIUS },
-            uIslands: { value: new Array(10).fill().map(() => new THREE.Vector4(0,0,0,0)) }, // xyz = center, w = radius
-            uIslandParams: { value: new Array(10).fill().map(() => new THREE.Vector2(0,0)) } // x = height, y = seed
+            uIslands: { value: new Array(10).fill().map(() => new THREE.Vector4(0,0,0,0)) }, 
+            uIslandParams: { value: new Array(10).fill().map(() => new THREE.Vector2(0,0)) } 
         };
         this.currentRippleIdx = 0;
         

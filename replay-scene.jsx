@@ -2,7 +2,7 @@ import { jsxDEV } from "react/jsx-dev-runtime";
 import React, { useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig, Audio, Sequence } from "remotion";
 import * as THREE from "three";
-import { createEarth, createAtmosphere, createSnakeHead, createFood, createBonusFood, createSegment } from "./replay-assets.js";
+import { createEarth, createAtmosphere, createSnakeHead, createFood, createBonusFood, createSegment, createIslandMesh } from "./replay-assets.js";
 const ReplayScene = ({ data, isMuted }) => {
   const frameIndex = useCurrentFrame();
   const { width, height, fps } = useVideoConfig();

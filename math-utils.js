@@ -47,31 +47,36 @@ export function getRandomPointOnSphere(radius) {
  */
 export function getIslandHeight(pos, islands, earthRadius) {
     let totalH = 0.0;
-    // Normalize position to get unit sphere coordinates for noise
     const pNorm = pos.clone().normalize();
     
-    // Islands logic matches shader
     for(const island of islands) {
+        // Only consider docked islands for physics (radius > 0 in terms of shader influence)
         if(island.radius <= 0) continue;
         
-        const dot = pNorm.dot(island.pos); // island.pos is normalized center
+        const dot = pNorm.dot(island.pos);
         const angle = Math.acos(Math.max(-1.0, Math.min(1.0, dot)));
         const dist = angle * earthRadius;
         
-        if (dist < island.radius) {
-            // Base Cosine hill shape
-            let shape = (Math.cos((dist / island.radius) * Math.PI) + 1.0) * 0.5;
+        // Influence radius slightly larger for blending the mesh into the sphere
+        const influenceR = island.radius * 1.5;
+        
+        if (dist < influenceR) {
+            // Smooth blend for shoreline
+            let factor = 1.0 - (dist / influenceR);
+            if (factor < 0) factor = 0;
             
-            // Add noise for detail
-            // Frequency 2.0, Amplitude 0.5 relative to height
-            const n = noise3D(pNorm.x * 2.0 + (island.seed || 0), pNorm.y * 2.0, pNorm.z * 2.0);
-            shape *= (1.0 + 0.5 * n);
-
-            // Apply Island Height
-            // If island.height is not defined, fallback to old radius-based height logic
-            const heightScale = island.height !== undefined ? island.height : (island.radius * 0.4);
+            // Cubic falloff
+            let blend = factor * factor * (3.0 - 2.0 * factor);
             
-            totalH += shape * heightScale; 
+            // Match noise params with visual mesh approx
+            const n = noise3D(pNorm.x * 3.0 + (island.seed || 0), pNorm.y * 3.0, pNorm.z * 3.0);
+            
+            // This height is mainly for smooth "shoreline" ramping. 
+            // The mesh handles the bulk of the island visual.
+            let h = blend * island.height;
+            h *= (1.0 + 0.2 * n);
+            
+            totalH = Math.max(totalH, h); 
         }
     }
     return totalH;

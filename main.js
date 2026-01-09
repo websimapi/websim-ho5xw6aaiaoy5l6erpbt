@@ -77,17 +77,17 @@ function getIntersection(x, y) {
     mouse.x = (x / window.innerWidth) * 2 - 1;
     mouse.y = -(y / window.innerHeight) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
-    return raycaster.intersectObject(game.earth);
+    // Intersect both earth and island meshes
+    return raycaster.intersectObjects(game.getInteractables(), true);
 }
 
 function handleInput(x, y) {
     const intersects = getIntersection(x, y);
 
     if (intersects.length > 0) {
-        // Pass the intersection point to the game logic
-        game.setTarget(intersects[0].point);
+        const hit = intersects[0];
+        game.setTarget(hit.point);
         
-        // Remove start message on first tap
         const msg = document.getElementById('start-message');
         if(msg) msg.style.display = 'none';
     }
@@ -99,7 +99,8 @@ let interactionStart = 0;
 function handleRippleTrigger(x, y, duration) {
     const intersects = getIntersection(x, y);
     if (intersects.length > 0) {
-        game.triggerRipple(intersects[0].point, duration);
+        const hit = intersects[0];
+        game.triggerTap(hit.point, duration, hit.object);
     }
 }
 
