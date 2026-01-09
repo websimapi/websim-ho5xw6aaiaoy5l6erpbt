@@ -52,7 +52,8 @@ const ReplayScene = ({ data, isMuted }) => {
     uRippleStartTimes: { value: new Array(5).fill(-1e3) },
     uRippleIntensities: { value: new Array(5).fill(0) },
     uEarthRadius: { value: 10 },
-    uIslands: { value: new Array(10).fill().map(() => new THREE.Vector4(0, 0, 0, 0)) }
+    uIslands: { value: new Array(10).fill().map(() => new THREE.Vector4(0, 0, 0, 0)) },
+    uIslandParams: { value: new Array(10).fill().map(() => new THREE.Vector2(0, 0)) }
   });
   const objectsRef = useRef({
     earth: null,
@@ -87,7 +88,7 @@ const ReplayScene = ({ data, isMuted }) => {
     const hemiLight = new THREE.HemisphereLight(16777215, 4473924, 1);
     scene.add(hemiLight);
     const r = data.config.earthRadius;
-    const earth = createEarth(r, rippleUniforms);
+    const earth = createEarth(10, rippleUniforms);
     scene.add(earth);
     const atmosphere = createAtmosphere(r);
     scene.add(atmosphere);
@@ -124,15 +125,21 @@ const ReplayScene = ({ data, isMuted }) => {
     const currentTime = safeIndex / fps;
     rippleUniforms.current.uTime.value = currentTime;
     if (frameData.env) {
-      rippleUniforms.current.uEarthRadius.value = frameData.env.radius || 10;
+      if (objectsRef.current.earth) {
+        const scale = (frameData.env.radius || 10) / 10;
+        objectsRef.current.earth.scale.setScalar(scale);
+      }
+      rippleUniforms.current.uEarthRadius.value = 10;
       const islands = frameData.env.islands || [];
       islands.forEach((isl, i) => {
         if (i < 10) {
           rippleUniforms.current.uIslands.value[i].set(isl.pos[0], isl.pos[1], isl.pos[2], isl.radius);
+          rippleUniforms.current.uIslandParams.value[i].set(isl.height || 0, isl.seed || 0);
         }
       });
       for (let i = islands.length; i < 10; i++) {
         rippleUniforms.current.uIslands.value[i].set(0, 0, 0, 0);
+        rippleUniforms.current.uIslandParams.value[i].set(0, 0);
       }
     }
     for (let i = 0; i < 5; i++) rippleUniforms.current.uRippleStartTimes.value[i] = -1e3;
@@ -221,7 +228,7 @@ const ReplayScene = ({ data, isMuted }) => {
   return /* @__PURE__ */ jsxDEV(AbsoluteFill, { children: [
     /* @__PURE__ */ jsxDEV("div", { ref: containerRef, style: { width: "100%", height: "100%" } }, void 0, false, {
       fileName: "<stdin>",
-      lineNumber: 288,
+      lineNumber: 301,
       columnNumber: 13
     }),
     /* @__PURE__ */ jsxDEV("div", { style: {
@@ -262,7 +269,7 @@ const ReplayScene = ({ data, isMuted }) => {
           false,
           {
             fileName: "<stdin>",
-            lineNumber: 307,
+            lineNumber: 320,
             columnNumber: 21
           }
         ),
@@ -280,12 +287,12 @@ const ReplayScene = ({ data, isMuted }) => {
           whiteSpace: "nowrap"
         }, children: playerInfo.username }, void 0, false, {
           fileName: "<stdin>",
-          lineNumber: 323,
+          lineNumber: 336,
           columnNumber: 21
         })
       ] }, void 0, true, {
         fileName: "<stdin>",
-        lineNumber: 301,
+        lineNumber: 314,
         columnNumber: 17
       }),
       /* @__PURE__ */ jsxDEV("div", { style: {
@@ -297,12 +304,12 @@ const ReplayScene = ({ data, isMuted }) => {
         marginTop: "10px"
       }, children: score }, void 0, false, {
         fileName: "<stdin>",
-        lineNumber: 339,
+        lineNumber: 352,
         columnNumber: 17
       })
     ] }, void 0, true, {
       fileName: "<stdin>",
-      lineNumber: 291,
+      lineNumber: 304,
       columnNumber: 13
     }),
     activeCues.map((cue) => {
@@ -310,17 +317,17 @@ const ReplayScene = ({ data, isMuted }) => {
       const finalVolume = isMuted ? 0 : 0.5 * (cue.volume ?? 1);
       return /* @__PURE__ */ jsxDEV(Sequence, { from: cue.frame, durationInFrames: duration, children: /* @__PURE__ */ jsxDEV(Audio, { src: cue.src, volume: finalVolume }, void 0, false, {
         fileName: "<stdin>",
-        lineNumber: 357,
+        lineNumber: 370,
         columnNumber: 25
       }) }, cue.id, false, {
         fileName: "<stdin>",
-        lineNumber: 356,
+        lineNumber: 369,
         columnNumber: 21
       });
     })
   ] }, void 0, true, {
     fileName: "<stdin>",
-    lineNumber: 287,
+    lineNumber: 300,
     columnNumber: 9
   });
 };

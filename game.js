@@ -24,7 +24,7 @@ export class Game {
         this.time = 0;
 
         // Islands
-        this.islands = []; // { pos: Vec3, maxRadius: float, currentRadius: float, progress: float }
+        this.islands = []; // { pos: Vec3, maxRadius: float, currentRadius: float, progress: float, seed: float, maxHeight: float, currentHeight: float }
         this.lastIslandScore = 0;
         this.MAX_ISLANDS = 10;
 
@@ -35,7 +35,8 @@ export class Game {
             uRippleStartTimes: { value: new Array(5).fill(-1000) },
             uRippleIntensities: { value: new Array(5).fill(0) },
             uEarthRadius: { value: this.BASE_RADIUS },
-            uIslands: { value: new Array(10).fill().map(() => new THREE.Vector4(0,0,0,0)) } // xyz = center, w = radius
+            uIslands: { value: new Array(10).fill().map(() => new THREE.Vector4(0,0,0,0)) }, // xyz = center, w = radius
+            uIslandParams: { value: new Array(10).fill().map(() => new THREE.Vector2(0,0)) } // x = height, y = seed
         };
         this.currentRippleIdx = 0;
         
@@ -127,8 +128,8 @@ export class Game {
             color: 0x88ccff,
             emissive: 0x002244, 
             emissiveIntensity: 0.8,
-            transparent: false,
-            opacity: 1.0,
+            transparent: true,
+            opacity: 0.9,
             roughness: 0.9,
             metalness: 0.0,
             side: THREE.DoubleSide
@@ -143,13 +144,63 @@ export class Game {
             shader.uniforms.uRippleIntensities = this.rippleUniforms.uRippleIntensities;
             shader.uniforms.uEarthRadius = this.rippleUniforms.uEarthRadius;
             shader.uniforms.uIslands = this.rippleUniforms.uIslands;
+            shader.uniforms.uIslandParams = this.rippleUniforms.uIslandParams;
 
             // Vertex Shader: Apply Displacement
             shader.vertexShader = shader.vertexShader.replace(
                 '#include <common>',
                 `#include <common>
+                // Simplex Noise (Approximation)
+                vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+                vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+                vec4 permute(vec4 x) { return mod289(((x*34.0)+1.0)*x); }
+                vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+                float snoise(vec3 v) {
+                    const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+                    const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+                    vec3 i  = floor(v + dot(v, C.yyy));
+                    vec3 x0 = v - dot(i, C.xxx);
+                    vec3 g = step(x0.yzx, x0.xyz);
+                    vec3 l = 1.0 - g;
+                    vec3 i1 = min( g.xyz, l.zxy );
+                    vec3 i2 = max( g.xyz, l.zxy );
+                    vec3 x1 = x0 - i1 + C.xxx;
+                    vec3 x2 = x0 - i2 + C.yyy;
+                    vec3 x3 = x0 - 1.0 + 3.0*C.xxx;
+                    i = mod289(i);
+                    vec4 p = permute( permute( permute( i.z + vec4(0.0, i1.z, i2.z, 1.0 )) + i.y + vec4(0.0, i1.y, i2.y, 1.0 )) + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
+                    float n_ = 0.142857142857;
+                    vec3  ns = n_ * D.wyz - D.xzx;
+                    vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+                    vec4 x_ = floor(j * ns.z);
+                    vec4 y_ = floor(j - 7.0 * x_ );
+                    vec4 x = x_ *ns.x + ns.yyyy;
+                    vec4 y = y_ *ns.x + ns.yyyy;
+                    vec4 h = 1.0 - abs(x) - abs(y);
+                    vec4 b0 = vec4( x.xy, y.xy );
+                    vec4 b1 = vec4( x.zw, y.zw );
+                    vec4 s0 = floor(b0)*2.0 + 1.0;
+                    vec4 s1 = floor(b1)*2.0 + 1.0;
+                    vec4 sh = -step(h, vec4(0.0));
+                    vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy ;
+                    vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww ;
+                    vec3 p0 = vec3(a0.xy,h.x);
+                    vec3 p1 = vec3(a0.zw,h.y);
+                    vec3 p2 = vec3(a1.xy,h.z);
+                    vec3 p3 = vec3(a1.zw,h.w);
+                    vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+                    p0 *= norm.x;
+                    p1 *= norm.y;
+                    p2 *= norm.z;
+                    p3 *= norm.w;
+                    vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+                    m = m * m;
+                    return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3) ) );
+                }
+
                 uniform float uEarthRadius;
                 uniform vec4 uIslands[10];
+                uniform vec2 uIslandParams[10]; // x = height, y = seed
                 varying vec3 vWorldPos;
                 varying float vHeight;
                 
@@ -163,8 +214,11 @@ export class Game {
                         float dist = angle * uEarthRadius;
                         
                         if (dist < uIslands[i].w) {
-                            float h = (cos((dist / uIslands[i].w) * 3.14159) + 1.0) * 0.5;
-                            totalH += h * (uIslands[i].w * 0.4); 
+                            float shape = (cos((dist / uIslands[i].w) * 3.14159) + 1.0) * 0.5;
+                            float noiseVal = snoise(pNorm * 2.0 + vec3(uIslandParams[i].y));
+                            shape *= (1.0 + 0.5 * noiseVal);
+                            
+                            totalH += shape * uIslandParams[i].x; 
                         }
                     }
                     return totalH;
@@ -292,6 +346,11 @@ export class Game {
         this.lastIslandScore = 0;
         this.rippleUniforms.uEarthRadius.value = this.BASE_RADIUS;
         this.rippleUniforms.uIslands.value.forEach(v => v.set(0,0,0,0));
+        this.rippleUniforms.uIslandParams.value.forEach(v => v.set(0,0));
+        
+        if (this.earth) {
+            this.earth.scale.set(1,1,1);
+        }
 
         // removed reset logic for segments/bonus foods - delegated to managers
         this.snake.reset();
@@ -368,30 +427,51 @@ export class Game {
         // 1. Grow Earth Radius
         const targetRadius = this.BASE_RADIUS + this.score * 0.05;
         this.earthRadius = THREE.MathUtils.lerp(this.earthRadius, targetRadius, dt * 0.5);
-        this.rippleUniforms.uEarthRadius.value = this.earthRadius;
+        
+        // Scale the mesh so Raycaster hits the larger sphere
+        // Shader uses uEarthRadius = 10.0 (BASE) for internal calculation relative to scale
+        if (this.earth) {
+            this.earth.scale.setScalar(this.earthRadius / this.BASE_RADIUS);
+        }
+        
+        // NOTE: Shader uEarthRadius kept at BASE_RADIUS (10.0) because vertex positions are local in shader 
+        // and mesh scale handles the world size.
+        // But for island distribution logic in shader, it relies on angle * radius.
+        // If we use 10.0, dist is "local arc length".
+        this.rippleUniforms.uEarthRadius.value = this.BASE_RADIUS;
 
         // 2. Spawn Islands
         if (this.score >= this.lastIslandScore + 50 && this.islands.length < this.MAX_ISLANDS) {
             this.lastIslandScore += 50;
-            // Spawn new island
             const pos = getRandomPointOnSphere(1.0).normalize();
             this.islands.push({
                 pos: pos,
-                maxRadius: 2.0 + Math.random() * 2.0, // Size var
+                maxRadius: 2.5 + Math.random() * 2.0,
+                maxHeight: 2.5 + Math.random() * 1.5,
                 currentRadius: 0.0,
+                currentHeight: 0.0,
+                seed: Math.random() * 100.0,
                 progress: 0.0
             });
         }
 
-        // 3. Update Islands
+        // 3. Update Islands (Floating Up Animation)
         this.islands.forEach((island, i) => {
             if (island.progress < 1.0) {
-                island.progress += dt * 0.2; // Grow over 5 seconds
-                island.currentRadius = island.maxRadius * Math.min(island.progress, 1.0);
+                island.progress += dt * 0.15; // Grow slowly
+                const t = Math.min(island.progress, 1.0);
+                
+                // Radius grows linearly
+                island.currentRadius = island.maxRadius * t;
+                
+                // Height grows non-linearly to simulate "emerging"
+                // Starts at 0, goes to maxHeight
+                island.currentHeight = island.maxHeight * (t * t * (3 - 2 * t)); 
             }
             // Update Uniforms
             if (i < 10) {
                 this.rippleUniforms.uIslands.value[i].set(island.pos.x, island.pos.y, island.pos.z, island.currentRadius);
+                this.rippleUniforms.uIslandParams.value[i].set(island.currentHeight, island.seed);
             }
         });
 
@@ -408,7 +488,12 @@ export class Game {
             
             const islandH = getIslandHeight(
                 pos,
-                this.islands.map(i => ({ pos: i.pos, radius: i.currentRadius })),
+                this.islands.map(i => ({ 
+                    pos: i.pos, 
+                    radius: i.currentRadius,
+                    height: i.currentHeight,
+                    seed: i.seed
+                })),
                 this.earthRadius
             );
             
@@ -518,7 +603,9 @@ export class Game {
                 radius: this.earthRadius,
                 islands: this.islands.map(i => ({
                     pos: i.pos.toArray(),
-                    radius: i.currentRadius
+                    radius: i.currentRadius,
+                    height: i.currentHeight,
+                    seed: i.seed
                 }))
             },
             events: [] // Filled by recorder

@@ -1,4 +1,11 @@
 import * as THREE from 'three';
+import { createNoise3D } from 'simplex-noise';
+import Alea from 'alea';
+
+// Use a seeded random for consistent noise across replays if needed, 
+// though visual noise for islands can be consistent just by coordinates.
+const prng = new Alea('spherical-snake');
+const noise3D = createNoise3D(prng);
 
 /**
  * Projects a target point onto the tangent plane of the source point on a sphere.
@@ -40,6 +47,7 @@ export function getRandomPointOnSphere(radius) {
  */
 export function getIslandHeight(pos, islands, earthRadius) {
     let totalH = 0.0;
+    // Normalize position to get unit sphere coordinates for noise
     const pNorm = pos.clone().normalize();
     
     // Islands logic matches shader
@@ -51,10 +59,19 @@ export function getIslandHeight(pos, islands, earthRadius) {
         const dist = angle * earthRadius;
         
         if (dist < island.radius) {
-            // Cosine hill shape
-            // Matches shader: (cos(dist/rad * PI) + 1.0) * 0.5 * (rad * 0.4)
-            const h = (Math.cos((dist / island.radius) * Math.PI) + 1.0) * 0.5;
-            totalH += h * (island.radius * 0.4); 
+            // Base Cosine hill shape
+            let shape = (Math.cos((dist / island.radius) * Math.PI) + 1.0) * 0.5;
+            
+            // Add noise for detail
+            // Frequency 2.0, Amplitude 0.5 relative to height
+            const n = noise3D(pNorm.x * 2.0 + (island.seed || 0), pNorm.y * 2.0, pNorm.z * 2.0);
+            shape *= (1.0 + 0.5 * n);
+
+            // Apply Island Height
+            // If island.height is not defined, fallback to old radius-based height logic
+            const heightScale = island.height !== undefined ? island.height : (island.radius * 0.4);
+            
+            totalH += shape * heightScale; 
         }
     }
     return totalH;
